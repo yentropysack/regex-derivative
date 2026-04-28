@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use Regex::*;
 
+#[derive(Clone, Debug)]
 enum Regex {
     // 空集合
     Emp,
@@ -14,6 +15,8 @@ enum Regex {
     Or(Rc<Regex>, Rc<Regex>),
     // クリーネ閉包
     Star(Rc<Regex>),
+    // Dot
+    Dot,
 }
 
 impl Regex {
@@ -34,6 +37,7 @@ impl Regex {
             Concat(r1, r2) => r1.contains_eps() && r2.contains_eps(),
             Or(r1, r2) => r1.contains_eps() || r2.contains_eps(),
             Star(_) => true,
+            Dot => false,
         }
     }
 
@@ -49,23 +53,33 @@ impl Regex {
                 }
             }
             Concat(r1, r2) => {
-                let left = Concat(r1.derive(target).into(), Rc::clone(r2));
+                let left = r1.derive(target).concat(Rc::clone(r2));
                 if r1.contains_eps() {
-                    Or(left.into(), r2.derive(target).into())
+                    left.or(r2.derive(target))
                 } else {
                     left
                 }
             }
-            Or(r1, r2) => Or(r1.derive(target).into(), r2.derive(target).into()),
-            Star(r) => Concat(r.derive(target).into(), Star(Rc::clone(r)).into()),
+            Or(r1, r2) => r1.derive(target).or(r2.derive(target)),
+            Star(r) => r.derive(target).concat(self.clone()),
+            Dot => Eps,
         }
+    }
+
+    fn concat(self, r2: impl Into<Rc<Regex>>) -> Self {
+        Concat(self.into(), r2.into())
+    }
+
+    fn or(self, r2: impl Into<Rc<Regex>>) -> Self {
+        Or(self.into(), r2.into())
+    }
+
+    fn star(self) -> Self {
+        Star(self.into())
     }
 }
 fn main() {
-    // a*
-    let a_star = Star(Char('a').into());
-    // a*b
-    let a_star_b = Concat(a_star.into(), Char('b').into());
-    let result = a_star_b.is_match("aabb");
-    println!("a*b: {result}");
+    let a_dot_b_star = Char('a').concat(Char('b')).star();
+    let result = a_dot_b_star.clone().is_match("ababab");
+    println!("(ab)*: {result}");
 }
