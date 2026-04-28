@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use Regex::*;
 
+//Brzozowski derivativeによる正規表現の実装
 #[derive(Clone, Debug)]
 enum Regex {
     // 空集合
@@ -79,7 +80,7 @@ impl Regex {
     }
 }
 fn main() {
-    let a_dot_b_star = Char('a').concat(Char('b')).star();
-    let result = a_dot_b_star.clone().is_match("ababab");
-    println!("(ab)*: {result}");
+    let a_dot_b = Char('a').concat(Dot).concat(Char('b'));
+    let result = a_dot_b.clone().is_match("abb");
+    println!("a.b: {result}");
 }
