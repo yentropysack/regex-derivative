@@ -80,6 +80,6 @@ impl Regex {
 }
 fn main() {
     let a_dot_b = Char('a').concat(Dot).concat(Char('b'));
-    let result = a_dot_b.clone().is_match("abb");
+    let result = a_dot_b.clone().is_match("abbc");
     println!("a.b: {result}");
 }
