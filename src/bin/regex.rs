@@ -21,13 +21,12 @@ enum Regex {
 }
 
 impl Regex {
-    fn is_match(mut self, text: &str) -> bool {
-        // 微分
-        text.chars().for_each(|c| {
-            self = self.derive(c);
-        });
-        // 残ったものにεは含まれるのか?
-        self.contains_eps()
+    fn is_match(self, text: &str) -> bool {
+        text.chars()
+            // 微分
+            .fold(self, |result, c| result.derive(c))
+            //残ったものにεは含まれるのか？
+            .contains_eps()
     }
 
     fn contains_eps(&self) -> bool {
