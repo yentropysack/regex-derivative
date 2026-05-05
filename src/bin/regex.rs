@@ -1,6 +1,7 @@
-use std::rc::Rc;
 use Regex::*;
-
+use anyhow::Result;
+use std::{iter::Peekable, rc::Rc};
+use thiserror::Error;
 //Brzozowski derivativeによる正規表現の実装
 #[derive(Clone, Debug)]
 enum Regex {
@@ -78,8 +79,121 @@ impl Regex {
         Star(self.into())
     }
 }
-fn main() {
-    let a_dot_b = Char('a').concat(Dot).concat(Char('b'));
-    let result = a_dot_b.clone().is_match("abbc");
-    println!("a.b: {result}");
+
+#[derive(Error, Debug)]
+enum ParseError {
+    #[error("the regex `{0}` is not available")]
+    UnimplmentedRegex(String),
+    #[error("bracket is not closed")]
+    InvalidBracket,
+    #[error("invalid syntax")]
+    InvalidSyntax,
+}
+
+// 正規表現のEBNF
+// <expr> ::= <term> ['|' <term>]*
+// <term> ::= <factor> [<factor>]*
+// <factor> ::= <atom> ['?'|'*'|'+']?
+// <atom> :: = '' | <char> | '(' <expr> ')'
+// <char> ::= メタ文字以外の全ての文字 | '.'
+struct Parser;
+
+impl Parser {
+    fn parse_regex(&self, source: impl Into<String>) -> Result<Regex, ParseError> {
+        self.parse_expr(&mut source.into().chars().into_iter().peekable())
+    }
+    fn parse_expr<I>(&self, iter: &mut Peekable<I>) -> Result<Regex, ParseError>
+    where
+        I: Iterator<Item = char>,
+    {
+        let mut val = self.parse_term(iter)?;
+        while let Some(&next) = iter.peek() {
+            match next {
+                '|' => {
+                    iter.next();
+                    let val2 = self.parse_term(iter)?;
+                    val = val.or(val2);
+                }
+                _ => break,
+            }
+        }
+        Ok(val)
+    }
+    fn parse_term<I>(&self, iter: &mut Peekable<I>) -> Result<Regex, ParseError>
+    where
+        I: Iterator<Item = char>,
+    {
+        let mut val = self.parse_factor(iter)?;
+        while let Some(&next) = iter.peek()
+            && next != '|'
+            && next != ')'
+        {
+            let val2 = self.parse_factor(iter)?;
+            val = val.concat(val2);
+        }
+        Ok(val)
+    }
+    fn parse_factor<I>(&self, iter: &mut Peekable<I>) -> Result<Regex, ParseError>
+    where
+        I: Iterator<Item = char>,
+    {
+        let mut val = self.parse_atom(iter)?;
+        if let Some(&next) = iter.peek() {
+            match next {
+                '?' => {
+                    return Err(ParseError::UnimplmentedRegex("?".into()));
+                }
+                '*' => {
+                    iter.next();
+                    val = val.star();
+                }
+                '+' => {
+                    return Err(ParseError::UnimplmentedRegex("+".into()));
+                }
+                _ => (),
+            }
+        }
+        Ok(val)
+    }
+    fn parse_atom<I>(&self, iter: &mut Peekable<I>) -> Result<Regex, ParseError>
+    where
+        I: Iterator<Item = char>,
+    {
+        if let Some(&next) = iter.peek() {
+            match next {
+                '(' => {
+                    iter.next();
+                    let inner = self.parse_expr(iter)?;
+                    return match iter.next() {
+                        Some(')') => Ok(inner),
+                        _ => Err(ParseError::InvalidBracket),
+                    };
+                }
+                _ => return self.parse_char(iter),
+            }
+        }
+        Ok(Eps)
+    }
+    fn parse_char<I>(&self, iter: &mut Peekable<I>) -> Result<Regex, ParseError>
+    where
+        I: Iterator<Item = char>,
+    {
+        match iter.next() {
+            Some(c) if !Self::is_meta(c) => Ok(Char(c)),
+            Some('.') => Ok(Dot),
+            _ => Err(ParseError::InvalidSyntax),
+        }
+    }
+    fn is_meta(c: char) -> bool {
+        c == '?' || c == '*' || c == '+' || c == '(' || c == ')' || c == '|' || c == '.'
+    }
+}
+fn main() -> Result<()> {
+    let parser = Parser;
+    let source = "(abc)";
+    let regex = parser.parse_regex(source)?;
+    println!("{:?}", regex);
+    let result = regex.clone().is_match("abc");
+    println!("{source}: {result}");
+    Ok(())
 }
