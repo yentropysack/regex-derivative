@@ -103,7 +103,7 @@ enum ParseError {
 // <term> ::= <factor> [<factor>]*
 // <factor> ::= <atom> ['?'|'*'|'+']?
 // <atom> :: = '' | <char> | '(' <expr> ')'
-// <char> ::= メタ文字以外の全ての文字 | '.'
+// <char> ::= メタ文字以外の全ての文字 | エスケープされたメタ文字 | '.'
 struct Parser;
 
 impl Parser {
@@ -189,21 +189,34 @@ impl Parser {
         I: Iterator<Item = char>,
     {
         match iter.next() {
-            Some(c) if !Self::is_meta(c) => Ok(Char(c)),
+            Some('\\') => match iter.next() {
+                Some(c) => Ok(Char(c)),
+                None => Err(ParseError::InvalidSyntax),
+            },
             Some('.') => Ok(Dot),
+            Some(c) if !Self::is_meta(c) => Ok(Char(c)),
             _ => Err(ParseError::InvalidSyntax),
         }
     }
     fn is_meta(c: char) -> bool {
-        c == '?' || c == '*' || c == '+' || c == '(' || c == ')' || c == '|' || c == '.'
+        c == '?'
+            || c == '*'
+            || c == '+'
+            || c == '('
+            || c == ')'
+            || c == '|'
+            || c == '.'
+            || c == '\\'
     }
 }
 fn main() -> Result<()> {
     let parser = Parser;
-    let source = "a?(bb)?";
+    let source = "https?://(d|e|f)+(\\.(d|e|f)+)+(/(d|e|f)+)+(\\?)((d|e|f|&|=)+))";
     let regex = parser.parse_regex(source)?;
     println!("{:?}", regex);
-    let result = regex.clone().is_match("bb");
+    let result = regex
+        .clone()
+        .is_match("https://dedede.dede.de/fff?dede=fff&eee=ddd");
     println!("{source}: {result}");
     Ok(())
 }
