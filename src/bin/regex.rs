@@ -78,12 +78,20 @@ impl Regex {
     fn star(self) -> Self {
         Star(self.into())
     }
+
+    fn plus(self) -> Self {
+        self.clone().or(self.star())
+    }
+
+    fn optional(self) -> Self {
+        self.or(Eps)
+    }
 }
 
 #[derive(Error, Debug)]
 enum ParseError {
-    #[error("the regex `{0}` is not available")]
-    UnimplmentedRegex(String),
+    // #[error("the regex `{0}` is not available")]
+    // UnimplmentedRegex(String),
     #[error("bracket is not closed")]
     InvalidBracket,
     #[error("invalid syntax")]
@@ -141,14 +149,16 @@ impl Parser {
         if let Some(&next) = iter.peek() {
             match next {
                 '?' => {
-                    return Err(ParseError::UnimplmentedRegex("?".into()));
+                    iter.next();
+                    val = val.optional();
                 }
                 '*' => {
                     iter.next();
                     val = val.star();
                 }
                 '+' => {
-                    return Err(ParseError::UnimplmentedRegex("+".into()));
+                    iter.next();
+                    val = val.plus();
                 }
                 _ => (),
             }
@@ -190,10 +200,10 @@ impl Parser {
 }
 fn main() -> Result<()> {
     let parser = Parser;
-    let source = "(abc)";
+    let source = "a?(bb)?";
     let regex = parser.parse_regex(source)?;
     println!("{:?}", regex);
-    let result = regex.clone().is_match("abc");
+    let result = regex.clone().is_match("bb");
     println!("{source}: {result}");
     Ok(())
 }
